@@ -4,22 +4,25 @@ import { useCallback, useState } from "react";
 import { useDropzone } from "react-dropzone";
 
 interface FileTransferUIProps {
-  onSendFile: (file: File) => void;
+  onFileSelect: (file: File) => void;
   downloadUrl: { url: string; name: string } | null;
   error: string | null;
   progress: { transferred: number; total: number; type: "send" | "receive" } | null;
+  incomingOffer: { name: string; size: number } | null;
+  acceptOffer: () => void;
+  rejectOffer: () => void;
 }
 
-export function FileTransferUI({ onSendFile, downloadUrl, error, progress }: FileTransferUIProps) {
+export function FileTransferUI({ onFileSelect, progress, downloadUrl, error, incomingOffer, acceptOffer, rejectOffer }: FileTransferUIProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
     if (file) {
       setSelectedFile(file);
-      onSendFile(file);
+      onFileSelect(file);
     }
-  }, [onSendFile]);
+  }, [onFileSelect]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({ 
     onDrop, 
@@ -58,6 +61,29 @@ export function FileTransferUI({ onSendFile, downloadUrl, error, progress }: Fil
           )}
         </div>
       </div>
+
+      {incomingOffer && !progress && (
+        <div className="w-full p-4 rounded-xl bg-blue-500/20 border border-blue-500/40 text-center animate-pulse">
+          <h3 className="text-lg font-medium text-white mb-2">Incoming File</h3>
+          <p className="text-blue-200 text-sm mb-4">
+            {incomingOffer.name} ({(incomingOffer.size / (1024 * 1024)).toFixed(2)} MB)
+          </p>
+          <div className="flex gap-4 justify-center">
+            <button 
+              onClick={rejectOffer}
+              className="px-4 py-2 rounded-lg bg-red-500/20 text-red-300 hover:bg-red-500/40 transition-colors text-sm font-medium"
+            >
+              Decline
+            </button>
+            <button 
+              onClick={acceptOffer}
+              className="px-4 py-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-colors text-sm font-medium"
+            >
+              Accept
+            </button>
+          </div>
+        </div>
+      )}
 
       {error && (
         <p className="text-sm font-medium text-red-400 bg-red-400/10 px-3 py-1.5 rounded">

@@ -40,7 +40,7 @@ export default function Home() {
     onMessage: (data) => handleReceiveDataRef.current?.(data),
   });
 
-  const { handleReceiveData, handleSendFile, downloadUrl, error, progress } = useFileTransfer(sendData, waitForBuffer);
+  const { handleReceiveData, handleSendFile, acceptOffer, rejectOffer, incomingOffer, downloadUrl, error, progress } = useFileTransfer(sendData, waitForBuffer);
   handleReceiveDataRef.current = handleReceiveData;
 
   const connectionState = useConnectionState({ peerReady, rtcState, isDataChannelOpen });
@@ -142,14 +142,17 @@ export default function Home() {
           {/* Peer / WebRTC status */}
           <PeerStatus connectionState={connectionState} />
 
-          {connectionState === "connected" && (
-            <FileTransferUI
-              onSendFile={handleSendFile}
-              downloadUrl={downloadUrl}
-              error={error}
+          {connectionState === "connected" ? (
+            <FileTransferUI 
+              onFileSelect={handleSendFile} 
+              downloadUrl={downloadUrl} 
+              error={error} 
               progress={progress}
+              incomingOffer={incomingOffer}
+              acceptOffer={acceptOffer}
+              rejectOffer={rejectOffer}
             />
-          )}
+          ) : null}
         </div>
 
         {/* Server connection indicator */}

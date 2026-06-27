@@ -28,7 +28,7 @@ export default function RoomPage() {
     onMessage: (data) => handleReceiveDataRef.current?.(data),
   });
 
-  const { handleReceiveData, handleSendFile, downloadUrl, error, progress } = useFileTransfer(sendData, waitForBuffer);
+  const { handleReceiveData, handleSendFile, acceptOffer, rejectOffer, incomingOffer, downloadUrl, error, progress } = useFileTransfer(sendData, waitForBuffer);
   handleReceiveDataRef.current = handleReceiveData;
 
   const connectionState = useConnectionState({ peerReady, rtcState, isDataChannelOpen });
@@ -115,11 +115,18 @@ export default function RoomPage() {
           <StatusIndicator 
             roomState={roomState} 
             connectionState={connectionState} 
-            onSendFile={handleSendFile}
-            downloadUrl={downloadUrl}
-            error={error}
-            progress={progress}
           />
+          {connectionState === "connected" ? (
+            <FileTransferUI 
+              onFileSelect={handleSendFile} 
+              downloadUrl={downloadUrl} 
+              error={error} 
+              progress={progress}
+              incomingOffer={incomingOffer}
+              acceptOffer={acceptOffer}
+              rejectOffer={rejectOffer}
+            />
+          ) : null}
         </div>
       </main>
     </div>
@@ -129,17 +136,9 @@ export default function RoomPage() {
 function StatusIndicator({ 
   roomState, 
   connectionState, 
-  onSendFile,
-  downloadUrl,
-  error,
-  progress
 }: { 
   roomState: RoomState; 
   connectionState: ConnectionState;
-  onSendFile: (file: File) => void;
-  downloadUrl: { url: string; name: string } | null;
-  error: string | null;
-  progress: { transferred: number; total: number; type: "send" | "receive" } | null;
 }) {
   // Connection errors and room-full take priority
   if (roomState === "room-full") {
@@ -191,13 +190,6 @@ function StatusIndicator({
           <p className="text-lg font-semibold text-emerald-400">Connected ✓</p>
           <p className="text-xs text-zinc-500">Peer connection established</p>
         </div>
-        
-        <FileTransferUI
-          onSendFile={onSendFile}
-          downloadUrl={downloadUrl}
-          error={error}
-          progress={progress}
-        />
       </div>
     );
   }

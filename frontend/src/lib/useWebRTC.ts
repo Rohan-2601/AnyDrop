@@ -96,8 +96,8 @@ export function useWebRTC({ socket, roomId, isInitiator, peerReady, onMessage }:
     const setupDataChannel = (dc: RTCDataChannel) => {
       dcRef.current = dc;
       dc.binaryType = "arraybuffer";
-      // Set the threshold for backpressure (e.g. 1MB)
-      dc.bufferedAmountLowThreshold = 1024 * 1024;
+      // Set the threshold for backpressure (e.g. 16MB for max throughput)
+      dc.bufferedAmountLowThreshold = 16 * 1024 * 1024;
       
       dc.onopen = () => {
         console.log(`[WebRTC] Data channel '${dc.label}' open`);
