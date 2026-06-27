@@ -37,7 +37,7 @@ export default function Home() {
     onMessage: (data) => handleReceiveDataRef.current?.(data),
   });
 
-  const { handleReceiveData, handleSendFile, downloadUrl, error } = useFileTransfer(sendData);
+  const { handleReceiveData, handleSendFile, downloadUrl, error, progress } = useFileTransfer(sendData);
   handleReceiveDataRef.current = handleReceiveData;
 
   const connectionState = useConnectionState({ peerReady, rtcState, isDataChannelOpen });
