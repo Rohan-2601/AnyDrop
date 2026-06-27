@@ -36,9 +36,9 @@ export default function RoomPage() {
   useEffect(() => {
     if (rtcState === "connected") {
       // Send a reply back if needed, but for now we just receive
-      // sendMessage("hello from phone");
+      // sendData("hello from phone");
     }
-  }, [rtcState, sendMessage]);
+  }, [rtcState, sendData]);
 
   useEffect(() => {
     const socket = socketRef.current;
