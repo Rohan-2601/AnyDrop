@@ -32,7 +32,7 @@ export default function Home() {
   const handleReceiveDataRef = useRef<((data: string | ArrayBuffer) => void) | null>(null);
 
   // Always the initiator (host creates the room)
-  const { rtcState, isDataChannelOpen, sendData } = useWebRTC({
+  const { rtcState, isDataChannelOpen, sendData, waitForBuffer } = useWebRTC({
     socket: socketRef.current,
     roomId,
     isInitiator: true,
@@ -40,7 +40,7 @@ export default function Home() {
     onMessage: (data) => handleReceiveDataRef.current?.(data),
   });
 
-  const { handleReceiveData, handleSendFile, downloadUrl, error, progress } = useFileTransfer(sendData);
+  const { handleReceiveData, handleSendFile, downloadUrl, error, progress } = useFileTransfer(sendData, waitForBuffer);
   handleReceiveDataRef.current = handleReceiveData;
 
   const connectionState = useConnectionState({ peerReady, rtcState, isDataChannelOpen });

@@ -20,7 +20,7 @@ export default function RoomPage() {
   const handleReceiveDataRef = useRef<((data: string | ArrayBuffer) => void) | null>(null);
 
   // The joiner is never the initiator — the host (homepage) always initiates
-  const { rtcState, isDataChannelOpen, sendData } = useWebRTC({
+  const { rtcState, isDataChannelOpen, sendData, waitForBuffer } = useWebRTC({
     socket: socketRef.current,
     roomId,
     isInitiator: false,
@@ -28,7 +28,7 @@ export default function RoomPage() {
     onMessage: (data) => handleReceiveDataRef.current?.(data),
   });
 
-  const { handleReceiveData, handleSendFile, downloadUrl, error, progress } = useFileTransfer(sendData);
+  const { handleReceiveData, handleSendFile, downloadUrl, error, progress } = useFileTransfer(sendData, waitForBuffer);
   handleReceiveDataRef.current = handleReceiveData;
 
   const connectionState = useConnectionState({ peerReady, rtcState, isDataChannelOpen });

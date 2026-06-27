@@ -11,7 +11,10 @@ export interface FileMetadata {
 
 const CHUNK_SIZE = 64 * 1024; // 64KB
 
-export function useFileTransfer(sendData: (data: string | ArrayBuffer) => void) {
+export function useFileTransfer(
+  sendData: (data: string | ArrayBuffer) => void,
+  waitForBuffer?: () => Promise<void>
+) {
   const [incomingMetadata, setIncomingMetadata] = useState<FileMetadata | null>(null);
   const [downloadUrl, setDownloadUrl] = useState<{ url: string; name: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -89,13 +92,23 @@ export function useFileTransfer(sendData: (data: string | ArrayBuffer) => void) 
     for (let offset = 0; offset < file.size; offset += CHUNK_SIZE) {
       const slice = file.slice(offset, offset + CHUNK_SIZE);
       const buffer = await slice.arrayBuffer();
+      
+      // Implement backpressure: Wait if the network buffer is full
+      if (waitForBuffer) {
+        await waitForBuffer();
+      }
+      
       sendData(buffer);
       
       transferred += buffer.byteLength;
       setProgress({ transferred, total: file.size, type: "send" });
       
-      // Let the event loop breathe for UI updates
-      await new Promise(r => setTimeout(r, 0));
+      // We no longer strictly need the setTimeout(r, 0) because waitForBuffer
+      // yields control to the event loop, but we'll keep a minimal yield
+      // just in case the buffer never fills up and we block the UI thread.
+      if (offset % (CHUNK_SIZE * 16) === 0) {
+        await new Promise(r => setTimeout(r, 0));
+      }
     }
 
     // 3. Send completion signal

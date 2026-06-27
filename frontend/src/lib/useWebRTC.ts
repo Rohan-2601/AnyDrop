@@ -96,6 +96,9 @@ export function useWebRTC({ socket, roomId, isInitiator, peerReady, onMessage }:
     const setupDataChannel = (dc: RTCDataChannel) => {
       dcRef.current = dc;
       dc.binaryType = "arraybuffer";
+      // Set the threshold for backpressure (e.g. 1MB)
+      dc.bufferedAmountLowThreshold = 1024 * 1024;
+      
       dc.onopen = () => {
         console.log(`[WebRTC] Data channel '${dc.label}' open`);
         setIsDataChannelOpen(true);
@@ -205,15 +208,33 @@ export function useWebRTC({ socket, roomId, isInitiator, peerReady, onMessage }:
   const sendData = useCallback((data: string | ArrayBuffer) => {
     if (dcRef.current?.readyState === "open") {
       dcRef.current.send(data as any);
+      // Suppress logging every single chunk to improve performance and avoid console spam
       if (typeof data === "string") {
         console.log(`[WebRTC] Sent string: ${data}`);
-      } else {
-        console.log(`[WebRTC] Sent binary of size: ${data.byteLength}`);
       }
     } else {
       console.warn(`[WebRTC] Data channel not open, cannot send data.`);
     }
   }, []);
 
-  return { rtcState, isDataChannelOpen, pc: pcRef, sendData };
+  const waitForBuffer = useCallback(async () => {
+    if (!dcRef.current) return;
+    const dc = dcRef.current;
+    
+    // If the buffer is below our threshold, we can send immediately
+    if (dc.bufferedAmount <= dc.bufferedAmountLowThreshold) {
+      return;
+    }
+
+    // Otherwise, wait for the 'bufferedamountlow' event
+    return new Promise<void>((resolve) => {
+      const handleLow = () => {
+        dc.removeEventListener("bufferedamountlow", handleLow);
+        resolve();
+      };
+      dc.addEventListener("bufferedamountlow", handleLow);
+    });
+  }, []);
+
+  return { rtcState, isDataChannelOpen, pc: pcRef, sendData, waitForBuffer };
 }
