@@ -66,12 +66,16 @@ export function useWebRTC({ socket, roomId, isInitiator, peerReady, onMessage }:
 
     const pc = new RTCPeerConnection(ICE_SERVERS);
     pcRef.current = pc;
+    iceCandidateQueue.current = []; // Clear stale queue from previous mounts
     setRtcState("connecting");
 
     // --- ICE candidate handling ---
     pc.onicecandidate = (event) => {
       if (event.candidate) {
+        console.log("[WebRTC] Sending local ICE candidate", event.candidate.candidate);
         socket.emit("ice-candidate", { roomId, candidate: event.candidate.toJSON() });
+      } else {
+        console.log("[WebRTC] All local ICE candidates gathered");
       }
     };
 
@@ -152,10 +156,16 @@ export function useWebRTC({ socket, roomId, isInitiator, peerReady, onMessage }:
     };
 
     const handleIceCandidate = async (data: { candidate: RTCIceCandidateInit }) => {
-      if (pc.remoteDescription) {
-        await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+      console.log("[WebRTC] Received remote ICE candidate", data.candidate.candidate);
+      if (pc.remoteDescription && pc.remoteDescription.type) {
+        try {
+          await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+        } catch (e) {
+          console.error("[WebRTC] Error adding received ICE candidate", e);
+        }
       } else {
         // Queue candidates that arrive before remote description is set
+        console.log("[WebRTC] Queueing ICE candidate because remote description is not set yet");
         iceCandidateQueue.current.push(data.candidate);
       }
     };
@@ -165,16 +175,25 @@ export function useWebRTC({ socket, roomId, isInitiator, peerReady, onMessage }:
     socket.on("ice-candidate", handleIceCandidate);
 
     // --- Initiator creates the offer ---
+    let offerTimeout: NodeJS.Timeout;
     if (isInitiator) {
-      (async () => {
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        socket.emit("offer", { roomId, sdp: offer });
-        console.log("[WebRTC] Sent offer");
-      })();
+      // Delay offer creation slightly to avoid React 18 StrictMode double-fire
+      offerTimeout = setTimeout(async () => {
+        try {
+          if (pc.signalingState !== "closed") {
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            socket.emit("offer", { roomId, sdp: offer });
+            console.log("[WebRTC] Sent offer");
+          }
+        } catch (e) {
+          console.error("[WebRTC] Error creating offer", e);
+        }
+      }, 500);
     }
 
     return () => {
+      clearTimeout(offerTimeout);
       socket.off("offer", handleOffer);
       socket.off("answer", handleAnswer);
       socket.off("ice-candidate", handleIceCandidate);
