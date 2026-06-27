@@ -4,7 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { customAlphabet } from "nanoid";
 import { QRCodeSVG } from "qrcode.react";
 import { getSocket } from "@/lib/socket";
-import { useWebRTC, type RTCState } from "@/lib/useWebRTC";
+import { useWebRTC } from "@/lib/useWebRTC";
+import { useConnectionState, type ConnectionState } from "@/lib/useConnectionState";
 import type { Socket } from "socket.io-client";
 
 const generateRoomId = customAlphabet("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", 6);
@@ -19,13 +20,15 @@ export default function Home() {
   const roomUrl = `http://localhost:3000/room/${roomId}`;
 
   // Always the initiator (host creates the room)
-  const { rtcState, sendMessage } = useWebRTC({
+  const { rtcState, isDataChannelOpen, sendMessage } = useWebRTC({
     socket: socketRef.current,
     roomId,
     isInitiator: true,
     peerReady,
     onMessage: (msg) => setReceivedMessage(msg),
   });
+
+  const connectionState = useConnectionState({ peerReady, rtcState, isDataChannelOpen });
 
   useEffect(() => {
     if (rtcState === "connected") {
@@ -116,7 +119,7 @@ export default function Home() {
           </div>
 
           {/* Peer / WebRTC status */}
-          <PeerStatus peerReady={peerReady} rtcState={rtcState} receivedMessage={receivedMessage} />
+          <PeerStatus connectionState={connectionState} receivedMessage={receivedMessage} />
         </div>
 
         {/* Server connection indicator */}
@@ -137,17 +140,17 @@ export default function Home() {
   );
 }
 
-function PeerStatus({ peerReady, rtcState, receivedMessage }: { peerReady: boolean; rtcState: RTCState; receivedMessage: string | null }) {
-  if (!peerReady) {
+function PeerStatus({ connectionState, receivedMessage }: { connectionState: ConnectionState; receivedMessage: string | null }) {
+  if (connectionState === "waiting") {
     return (
       <div className="flex items-center gap-2.5">
         <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.5)]" />
-        <span className="text-sm text-zinc-400">Waiting for peer…</span>
+        <span className="text-sm text-zinc-400">Waiting for peer...</span>
       </div>
     );
   }
 
-  if (rtcState === "connected") {
+  if (connectionState === "connected") {
     return (
       <div className="flex flex-col items-center gap-2">
         <div className="flex items-center gap-2.5">
@@ -161,7 +164,7 @@ function PeerStatus({ peerReady, rtcState, receivedMessage }: { peerReady: boole
     );
   }
 
-  if (rtcState === "failed") {
+  if (connectionState === "failed") {
     return (
       <div className="flex items-center gap-2.5">
         <span className="h-2.5 w-2.5 rounded-full bg-red-400 shadow-[0_0_6px_rgba(248,113,113,0.5)]" />
@@ -173,7 +176,7 @@ function PeerStatus({ peerReady, rtcState, receivedMessage }: { peerReady: boole
   return (
     <div className="flex items-center gap-2.5">
       <div className="h-4 w-4 animate-spin rounded-full border-2 border-zinc-700 border-t-indigo-400" />
-      <span className="text-sm text-zinc-400">Establishing peer connection…</span>
+      <span className="text-sm text-zinc-400">Connecting...</span>
     </div>
   );
 }

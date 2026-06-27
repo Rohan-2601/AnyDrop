@@ -23,6 +23,7 @@ interface UseWebRTCOptions {
 
 export function useWebRTC({ socket, roomId, isInitiator, peerReady, onMessage }: UseWebRTCOptions) {
   const [rtcState, setRtcState] = useState<RTCState>("new");
+  const [isDataChannelOpen, setIsDataChannelOpen] = useState(false);
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const dcRef = useRef<RTCDataChannel | null>(null);
   const iceCandidateQueue = useRef<RTCIceCandidateInit[]>([]);
@@ -37,6 +38,7 @@ export function useWebRTC({ socket, roomId, isInitiator, peerReady, onMessage }:
       pcRef.current = null;
     }
     setRtcState("new");
+    setIsDataChannelOpen(false);
   }, []);
 
   useEffect(() => {
@@ -73,8 +75,14 @@ export function useWebRTC({ socket, roomId, isInitiator, peerReady, onMessage }:
 
     const setupDataChannel = (dc: RTCDataChannel) => {
       dcRef.current = dc;
-      dc.onopen = () => console.log(`[WebRTC] Data channel '${dc.label}' open`);
-      dc.onclose = () => console.log(`[WebRTC] Data channel '${dc.label}' closed`);
+      dc.onopen = () => {
+        console.log(`[WebRTC] Data channel '${dc.label}' open`);
+        setIsDataChannelOpen(true);
+      };
+      dc.onclose = () => {
+        console.log(`[WebRTC] Data channel '${dc.label}' closed`);
+        setIsDataChannelOpen(false);
+      };
       dc.onmessage = (event) => {
         console.log(`[WebRTC] Received message: ${event.data}`);
         onMessage?.(event.data);
@@ -163,5 +171,5 @@ export function useWebRTC({ socket, roomId, isInitiator, peerReady, onMessage }:
     }
   }, []);
 
-  return { rtcState, pc: pcRef, sendMessage };
+  return { rtcState, isDataChannelOpen, pc: pcRef, sendMessage };
 }

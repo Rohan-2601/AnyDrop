@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { getSocket } from "@/lib/socket";
-import { useWebRTC, type RTCState } from "@/lib/useWebRTC";
+import { useWebRTC } from "@/lib/useWebRTC";
+import { useConnectionState, type ConnectionState } from "@/lib/useConnectionState";
 import type { Socket } from "socket.io-client";
 
 type RoomState = "connecting" | "waiting" | "ready" | "room-full" | "error";
@@ -16,13 +17,15 @@ export default function RoomPage() {
   const socketRef = useRef<Socket>(getSocket());
 
   // The joiner is never the initiator — the host (homepage) always initiates
-  const { rtcState, sendMessage } = useWebRTC({
+  const { rtcState, isDataChannelOpen, sendMessage } = useWebRTC({
     socket: socketRef.current,
     roomId,
     isInitiator: false,
     peerReady,
     onMessage: (msg) => setReceivedMessage(msg),
   });
+
+  const connectionState = useConnectionState({ peerReady, rtcState, isDataChannelOpen });
 
   useEffect(() => {
     if (rtcState === "connected") {
@@ -103,14 +106,14 @@ export default function RoomPage() {
 
         {/* Status Card */}
         <div className="flex flex-col items-center gap-4 rounded-2xl border border-zinc-800/60 bg-zinc-900/70 px-12 py-8">
-          <StatusIndicator roomState={roomState} rtcState={rtcState} receivedMessage={receivedMessage} />
+          <StatusIndicator roomState={roomState} connectionState={connectionState} receivedMessage={receivedMessage} />
         </div>
       </main>
     </div>
   );
 }
 
-function StatusIndicator({ roomState, rtcState, receivedMessage }: { roomState: RoomState; rtcState: RTCState; receivedMessage: string | null }) {
+function StatusIndicator({ roomState, connectionState, receivedMessage }: { roomState: RoomState; connectionState: ConnectionState; receivedMessage: string | null }) {
   // Connection errors and room-full take priority
   if (roomState === "room-full") {
     return (
@@ -141,20 +144,19 @@ function StatusIndicator({ roomState, rtcState, receivedMessage }: { roomState: 
     );
   }
 
-  if (roomState === "waiting") {
+  if (connectionState === "waiting") {
     return (
       <>
         <div className="flex items-center justify-center">
           <span className="h-3 w-3 animate-pulse rounded-full bg-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.5)]" />
         </div>
-        <p className="text-base font-medium text-zinc-300">Waiting for peer…</p>
+        <p className="text-base font-medium text-zinc-300">Waiting for peer...</p>
         <p className="text-xs text-zinc-500">Share the room link or scan the QR code</p>
       </>
     );
   }
 
-  // roomState === "ready" — show WebRTC state
-  if (rtcState === "connected") {
+  if (connectionState === "connected") {
     return (
       <>
         <StatusIcon type="success" />
@@ -169,11 +171,11 @@ function StatusIndicator({ roomState, rtcState, receivedMessage }: { roomState: 
     );
   }
 
-  if (rtcState === "failed") {
+  if (connectionState === "failed") {
     return (
       <>
         <StatusIcon type="error" />
-        <p className="text-lg font-semibold text-red-400">Peer Connection Failed</p>
+        <p className="text-lg font-semibold text-red-400">Connection Failed</p>
         <p className="text-xs text-zinc-500">Could not establish a direct connection</p>
       </>
     );
@@ -182,7 +184,7 @@ function StatusIndicator({ roomState, rtcState, receivedMessage }: { roomState: 
   return (
     <>
       <Spinner />
-      <p className="text-sm text-zinc-400">Establishing peer connection…</p>
+      <p className="text-sm text-zinc-400">Connecting...</p>
     </>
   );
 }
