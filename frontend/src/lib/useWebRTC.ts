@@ -18,7 +18,7 @@ interface UseWebRTCOptions {
   isInitiator: boolean;
   /** Set to true when both peers are in the room */
   peerReady: boolean;
-  onMessage?: (msg: string) => void;
+  onMessage?: (msg: string | ArrayBuffer) => void;
 }
 
 export function useWebRTC({ socket, roomId, isInitiator, peerReady, onMessage }: UseWebRTCOptions) {
@@ -75,6 +75,7 @@ export function useWebRTC({ socket, roomId, isInitiator, peerReady, onMessage }:
 
     const setupDataChannel = (dc: RTCDataChannel) => {
       dcRef.current = dc;
+      dc.binaryType = "arraybuffer";
       dc.onopen = () => {
         console.log(`[WebRTC] Data channel '${dc.label}' open`);
         setIsDataChannelOpen(true);
@@ -84,7 +85,11 @@ export function useWebRTC({ socket, roomId, isInitiator, peerReady, onMessage }:
         setIsDataChannelOpen(false);
       };
       dc.onmessage = (event) => {
-        console.log(`[WebRTC] Received message: ${event.data}`);
+        if (typeof event.data === "string") {
+          console.log(`[WebRTC] Received message string: ${event.data}`);
+        } else {
+          console.log(`[WebRTC] Received message binary of size: ${event.data.byteLength}`);
+        }
         onMessage?.(event.data);
       };
     };
@@ -162,14 +167,18 @@ export function useWebRTC({ socket, roomId, isInitiator, peerReady, onMessage }:
     };
   }, [socket, roomId, isInitiator, peerReady, cleanup]);
 
-  const sendMessage = useCallback((msg: string) => {
+  const sendData = useCallback((data: string | ArrayBuffer) => {
     if (dcRef.current?.readyState === "open") {
-      dcRef.current.send(msg);
-      console.log(`[WebRTC] Sent message: ${msg}`);
+      dcRef.current.send(data as any);
+      if (typeof data === "string") {
+        console.log(`[WebRTC] Sent string: ${data}`);
+      } else {
+        console.log(`[WebRTC] Sent binary of size: ${data.byteLength}`);
+      }
     } else {
-      console.warn(`[WebRTC] Data channel not open, cannot send: ${msg}`);
+      console.warn(`[WebRTC] Data channel not open, cannot send data.`);
     }
   }, []);
 
-  return { rtcState, isDataChannelOpen, pc: pcRef, sendMessage };
+  return { rtcState, isDataChannelOpen, pc: pcRef, sendData };
 }

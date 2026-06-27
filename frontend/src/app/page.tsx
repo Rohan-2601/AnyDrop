@@ -6,35 +6,45 @@ import { QRCodeSVG } from "qrcode.react";
 import { getSocket } from "@/lib/socket";
 import { useWebRTC } from "@/lib/useWebRTC";
 import { useConnectionState, type ConnectionState } from "@/lib/useConnectionState";
+import { useFileTransfer } from "@/lib/useFileTransfer";
+import { FileTransferUI } from "@/components/FileTransferUI";
 import type { Socket } from "socket.io-client";
 
 const generateRoomId = customAlphabet("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", 6);
 
 export default function Home() {
+  const [mounted, setMounted] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [peerReady, setPeerReady] = useState(false);
-  const [receivedMessage, setReceivedMessage] = useState<string | null>(null);
   const socketRef = useRef<Socket>(getSocket());
 
   const roomId = useMemo(() => generateRoomId(), []);
   const roomUrl = `http://localhost:3000/room/${roomId}`;
 
+  // We need sendData before we can create useFileTransfer, but we need onMessage for useWebRTC.
+  // We can use a ref for handleReceiveData to break the cyclic dependency if needed, 
+  // or just declare useFileTransfer after and pass it.
+  // But useWebRTC returns sendData, so we can't pass useFileTransfer's handleReceiveData directly.
+  // Let's use a ref.
+  const handleReceiveDataRef = useRef<(data: string | ArrayBuffer) => void>();
+
   // Always the initiator (host creates the room)
-  const { rtcState, isDataChannelOpen, sendMessage } = useWebRTC({
+  const { rtcState, isDataChannelOpen, sendData } = useWebRTC({
     socket: socketRef.current,
     roomId,
     isInitiator: true,
     peerReady,
-    onMessage: (msg) => setReceivedMessage(msg),
+    onMessage: (data) => handleReceiveDataRef.current?.(data),
   });
+
+  const { handleReceiveData, handleSendFile, downloadUrl, error } = useFileTransfer(sendData);
+  handleReceiveDataRef.current = handleReceiveData;
 
   const connectionState = useConnectionState({ peerReady, rtcState, isDataChannelOpen });
 
   useEffect(() => {
-    if (rtcState === "connected") {
-      sendMessage("hello world");
-    }
-  }, [rtcState, sendMessage]);
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     const socket = socketRef.current;
@@ -76,6 +86,14 @@ export default function Home() {
       socket.disconnect();
     };
   }, [roomId]);
+
+  if (!mounted) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-950 font-sans text-white">
+        {/* Placeholder while mounting */}
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-950 font-sans text-white">
@@ -119,7 +137,16 @@ export default function Home() {
           </div>
 
           {/* Peer / WebRTC status */}
-          <PeerStatus connectionState={connectionState} receivedMessage={receivedMessage} />
+          <PeerStatus connectionState={connectionState} />
+
+          {connectionState === "connected" && (
+            <FileTransferUI
+              onSendFile={handleSendFile}
+              downloadUrl={downloadUrl}
+              error={error}
+              progress={progress}
+            />
+          )}
         </div>
 
         {/* Server connection indicator */}
@@ -140,7 +167,7 @@ export default function Home() {
   );
 }
 
-function PeerStatus({ connectionState, receivedMessage }: { connectionState: ConnectionState; receivedMessage: string | null }) {
+function PeerStatus({ connectionState }: { connectionState: ConnectionState }) {
   if (connectionState === "waiting") {
     return (
       <div className="flex items-center gap-2.5">
@@ -157,9 +184,6 @@ function PeerStatus({ connectionState, receivedMessage }: { connectionState: Con
           <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.5)]" />
           <span className="text-sm font-medium text-emerald-400">Connected ✓</span>
         </div>
-        {receivedMessage && (
-          <p className="text-sm text-zinc-300">Received: {receivedMessage}</p>
-        )}
       </div>
     );
   }

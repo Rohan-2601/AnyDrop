@@ -5,6 +5,8 @@ import { useParams } from "next/navigation";
 import { getSocket } from "@/lib/socket";
 import { useWebRTC } from "@/lib/useWebRTC";
 import { useConnectionState, type ConnectionState } from "@/lib/useConnectionState";
+import { useFileTransfer } from "@/lib/useFileTransfer";
+import { FileTransferUI } from "@/components/FileTransferUI";
 import type { Socket } from "socket.io-client";
 
 type RoomState = "connecting" | "waiting" | "ready" | "room-full" | "error";
@@ -13,17 +15,21 @@ export default function RoomPage() {
   const { id: roomId } = useParams<{ id: string }>();
   const [roomState, setRoomState] = useState<RoomState>("connecting");
   const [peerReady, setPeerReady] = useState(false);
-  const [receivedMessage, setReceivedMessage] = useState<string | null>(null);
   const socketRef = useRef<Socket>(getSocket());
 
+  const handleReceiveDataRef = useRef<(data: string | ArrayBuffer) => void>();
+
   // The joiner is never the initiator — the host (homepage) always initiates
-  const { rtcState, isDataChannelOpen, sendMessage } = useWebRTC({
+  const { rtcState, isDataChannelOpen, sendData } = useWebRTC({
     socket: socketRef.current,
     roomId,
     isInitiator: false,
     peerReady,
-    onMessage: (msg) => setReceivedMessage(msg),
+    onMessage: (data) => handleReceiveDataRef.current?.(data),
   });
+
+  const { handleReceiveData, handleSendFile, downloadUrl, error } = useFileTransfer(sendData);
+  handleReceiveDataRef.current = handleReceiveData;
 
   const connectionState = useConnectionState({ peerReady, rtcState, isDataChannelOpen });
 
@@ -105,15 +111,36 @@ export default function RoomPage() {
         </div>
 
         {/* Status Card */}
-        <div className="flex flex-col items-center gap-4 rounded-2xl border border-zinc-800/60 bg-zinc-900/70 px-12 py-8">
-          <StatusIndicator roomState={roomState} connectionState={connectionState} receivedMessage={receivedMessage} />
+        <div className="flex flex-col items-center gap-4 rounded-2xl border border-zinc-800/60 bg-zinc-900/70 px-12 py-8 w-full max-w-md">
+          <StatusIndicator 
+            roomState={roomState} 
+            connectionState={connectionState} 
+            onSendFile={handleSendFile}
+            downloadUrl={downloadUrl}
+            error={error}
+            progress={progress}
+          />
         </div>
       </main>
     </div>
   );
 }
 
-function StatusIndicator({ roomState, connectionState, receivedMessage }: { roomState: RoomState; connectionState: ConnectionState; receivedMessage: string | null }) {
+function StatusIndicator({ 
+  roomState, 
+  connectionState, 
+  onSendFile,
+  downloadUrl,
+  error,
+  progress
+}: { 
+  roomState: RoomState; 
+  connectionState: ConnectionState;
+  onSendFile: (file: File) => void;
+  downloadUrl: { url: string; name: string } | null;
+  error: string | null;
+  progress: { transferred: number; total: number; type: "send" | "receive" } | null;
+}) {
   // Connection errors and room-full take priority
   if (roomState === "room-full") {
     return (
@@ -158,16 +185,20 @@ function StatusIndicator({ roomState, connectionState, receivedMessage }: { room
 
   if (connectionState === "connected") {
     return (
-      <>
-        <StatusIcon type="success" />
-        <p className="text-lg font-semibold text-emerald-400">Connected ✓</p>
-        <p className="text-xs text-zinc-500">Peer connection established</p>
-        {receivedMessage && (
-          <div className="mt-2 rounded bg-zinc-800/60 px-4 py-2">
-            <p className="text-sm text-zinc-300">Received: {receivedMessage}</p>
-          </div>
-        )}
-      </>
+      <div className="flex flex-col items-center gap-4 w-full">
+        <div className="flex flex-col items-center gap-2">
+          <StatusIcon type="success" />
+          <p className="text-lg font-semibold text-emerald-400">Connected ✓</p>
+          <p className="text-xs text-zinc-500">Peer connection established</p>
+        </div>
+        
+        <FileTransferUI
+          onSendFile={onSendFile}
+          downloadUrl={downloadUrl}
+          error={error}
+          progress={progress}
+        />
+      </div>
     );
   }
 
