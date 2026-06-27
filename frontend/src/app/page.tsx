@@ -19,7 +19,10 @@ export default function Home() {
   const socketRef = useRef<Socket>(getSocket());
 
   const roomId = useMemo(() => generateRoomId(), []);
-  const roomUrl = `http://localhost:3000/room/${roomId}`;
+  
+  const roomUrl = mounted 
+    ? `${window.location.origin}/room/${roomId}`
+    : `http://localhost:3000/room/${roomId}`;
 
   // We need sendData before we can create useFileTransfer, but we need onMessage for useWebRTC.
   // We can use a ref for handleReceiveData to break the cyclic dependency if needed, 

@@ -7,15 +7,17 @@ import { joinRoom, leaveRoom } from "./roomManager.js";
 const app = express();
 const httpServer = createServer(app);
 
+const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+
 const io = new Server(httpServer, {
   cors: {
-    origin: "http://localhost:3000",
+    origin: frontendUrl,
     methods: ["GET", "POST"],
   },
 });
 
 // Middleware
-app.use(cors({ origin: "http://localhost:3000" }));
+app.use(cors({ origin: frontendUrl }));
 app.use(express.json());
 
 // Health check endpoint
