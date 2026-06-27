@@ -26,7 +26,7 @@ export default function Home() {
   // or just declare useFileTransfer after and pass it.
   // But useWebRTC returns sendData, so we can't pass useFileTransfer's handleReceiveData directly.
   // Let's use a ref.
-  const handleReceiveDataRef = useRef<(data: string | ArrayBuffer) => void>();
+  const handleReceiveDataRef = useRef<((data: string | ArrayBuffer) => void) | null>(null);
 
   // Always the initiator (host creates the room)
   const { rtcState, isDataChannelOpen, sendData } = useWebRTC({

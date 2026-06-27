@@ -17,7 +17,7 @@ export default function RoomPage() {
   const [peerReady, setPeerReady] = useState(false);
   const socketRef = useRef<Socket>(getSocket());
 
-  const handleReceiveDataRef = useRef<(data: string | ArrayBuffer) => void>();
+  const handleReceiveDataRef = useRef<((data: string | ArrayBuffer) => void) | null>(null);
 
   // The joiner is never the initiator — the host (homepage) always initiates
   const { rtcState, isDataChannelOpen, sendData } = useWebRTC({
